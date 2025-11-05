@@ -1,0 +1,28 @@
+pipeline:
+  batch_size: 8
+  max_iters: 100
+
+wcache:
+  alpha: 0.4
+  beta: 0.3
+  gamma: 0.2
+  delta: 0.1
+  promote_threshold: 0.5
+
+mutators:
+  binary: true
+  semantic: true
+  directed: false
+  llm: true
+
+execution:
+  iss: "spike"
+  dut_count: 3
+  dut_cmd: "verilator +trace {input} -o sim"
+  timeout_sec: 30
+
+llm:
+  model: "deepseek-v3-241226"
+  temperature: 0.2
+  max_tokens: 2048
+  timeout_sec: 600
