@@ -10,6 +10,7 @@ General-Purpose LLM Interface for \name\ Pipeline
 import os
 import logging
 from typing import Tuple, Optional, Dict, Any
+import openai
 from openai import OpenAI, APIError, RateLimitError, Timeout
 from pathlib import Path
 import yaml
@@ -26,11 +27,19 @@ if not CONFIG_PATH.exists():
 CONFIG = yaml.safe_load(CONFIG_PATH.read_text())
 LLM_CONFIG = CONFIG.get("llm", {})
 
+os.environ["OPENAI_API_BASE"] = LLM_CONFIG.get("base_url")
+os.environ["OPENAI_API_KEY"] = LLM_CONFIG.get("api_key")
+
 # === LLM Client ===
+# client = OpenAI(
+#     api_key=os.getenv("OPENAI_API_KEY", LLM_CONFIG.get("api_key")),
+#     base_url=os.getenv("OPENAI_API_BASE", LLM_CONFIG.get("base_url")),
+#     timeout=LLM_CONFIG.get("timeout_sec", 600),
+# )
 client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY"),
-    base_url=os.getenv("OPENAI_API_BASE", LLM_CONFIG.get("base_url", "https://api.openai.com/v1")),
-    timeout=LLM_CONFIG.get("timeout_sec", 600),
+    api_key=os.environ.get("OPENAI_API_KEY"),
+    base_url=os.environ.get("OPENAI_API_BASE"),
+    timeout=openai.Timeout(LLM_CONFIG.get("time_sec"), connect=LLM_CONFIG.get("time_sec"))
 )
 
 # === General Call ===

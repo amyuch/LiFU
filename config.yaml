@@ -1,6 +1,8 @@
 pipeline:
   batch_size: 8
   max_iters: 100
+  seed_sources:
+    - corpus/initial_seeds
 
 wcache:
   alpha: 0.4
@@ -8,6 +10,14 @@ wcache:
   gamma: 0.2
   delta: 0.1
   promote_threshold: 0.5
+
+duts:
+  - name: "rocket"
+    path: "/path/to/rocket-chip"
+    config: "configs/RocketConfig.scala"
+  - name: "boom"
+    path: "/path/to/boom"
+    config: "configs/BoomConfig.scala"
 
 mutators:
   binary: true
@@ -22,7 +32,11 @@ execution:
   timeout_sec: 30
 
 llm:
-  model: "deepseek-v3-241226"
-  temperature: 0.2
+  model: "deepseek-v3-1-250821"
+  base_url: "base"
+  api_key: "api-key"
+  temperature: 0.6
   max_tokens: 2048
   timeout_sec: 600
+  system_prompt: "You are a hardware verification expert, especially for RISCV CPU like Rocket, Boom, and so on."
+  

@@ -1,31 +1,69 @@
-# scripts/1_fetch.py
-import yaml, json, asyncio
+# scripts/fetch/fetch.py
+"""
+Fetch Stage: Select and promote seeds from corpus + W$
+Output: queue_fetch/*.s
+"""
+import sys
 from pathlib import Path
+
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
+import yaml
+import json
 from utils.models import Testcase
 from utils.wcache import WeightCache
 
-CONFIG = yaml.safe_load(Path("../config.yaml").read_text())
-WCACHE = WeightCache(Path("../wcache.json"), CONFIG["wcache"])
-CORPUS_DIR = Path("../corpus")
-QUEUE_DIR = Path("../queue_fetch")
+# === Paths ===
+ROOT = Path(__file__).parent.parent.parent
+CONFIG = yaml.safe_load((ROOT / "config.yaml").read_text())
+WCACHE = WeightCache(ROOT / "wcache.json", CONFIG["wcache"])
+QUEUE_DIR = ROOT / "queue_fetch"
 QUEUE_DIR.mkdir(exist_ok=True)
 
-async def fetch():
-    # Load all seeds
-    seeds = []
-    for src in ["initial_seeds", "runtime", "prior_work"]:
-        for f in (CORPUS_DIR / src).glob("*.s"):
-            seeds.append(Testcase.from_file(f, source=src))
+def fetch():
+    print("[FETCH] Starting seed selection...")
 
-    # Promote from W$
-    top = WCACHE.top_k(CONFIG["pipeline"]["batch_size"])
-    promoted = [s for s in seeds if s.id in [x[0] for x in top]]
+    # 1. Load all seeds from sources
+    seeds = []
+    for src_path in CONFIG["pipeline"]["seed_sources"]:
+        src = ROOT / src_path
+        print(f"[LOAD] {src}")
+        if not src.exists():
+            print(f"[WARN] Source not found: {src}")
+            continue
+        for f in (src.glob("*.S")):
+            print(f"  [LOAD] {f.name}")
+            try:
+                tc = Testcase.from_file(f, source=src_path)
+                seeds.append(tc)
+                print(f"  [LOAD] {tc.id} ← {f.name}")
+            except Exception as e:
+                print(f"  [SKIP] {f}: {e}")
+
+    if not seeds:
+        print("[ERROR] No seeds found!")
+        return
+
+    # 2. Promote from W$
+    top_k = WCACHE.top_k(CONFIG["pipeline"]["batch_size"])
+    promoted_ids = [tid for tid, _ in top_k]
+    promoted = [s for s in seeds if s.id in promoted_ids]
+
+    # 3. Fallback: take random if not enough
+    import random
+    if len(promoted) < CONFIG["pipeline"]["batch_size"]:
+        remaining = [s for s in seeds if s.id not in promoted_ids]
+        random.shuffle(remaining)
+        promoted += remaining[:CONFIG["pipeline"]["batch_size"] - len(promoted)]
+
     selected = promoted[:CONFIG["pipeline"]["batch_size"]]
 
-    # Save to queue
-    for s in selected:
-        s.save(QUEUE_DIR)
-    print(f"[FETCH] → {len(selected)} seeds")
+    # 4. Save to queue
+    for tc in selected:
+        out_path = tc.save(QUEUE_DIR)
+        print(f"  [QUEUE] {tc.id} → {out_path.name}")
+
+    print(f"[FETCH] Selected {len(selected)} seeds → queue_fetch/")
 
 if __name__ == "__main__":
-    asyncio.run(fetch())
+    fetch()
